@@ -27,7 +27,6 @@ class ApplicationController < ActionController::Base
     before_filter :check_in_post_redirect
     before_filter :session_remember_me
     before_filter :set_vary_header
-    before_filter :set_popup_banner
 
     def set_vary_header
         response.headers['Vary'] = 'Cookie'
@@ -52,6 +51,9 @@ class ApplicationController < ActionController::Base
         anonymous_cache(24.hours)
     end
 
+    # This is an override of the method provided by gettext_i18n_rails - note the explicit
+    # setting of I18n.locale, required due to the I18nProxy used in Rails 3 to trigger the
+    # lookup_context and expire the template cache
     def set_gettext_locale
         if AlaveteliConfiguration::include_default_locale_in_urls == false
             params_locale = params[:locale] ? params[:locale] : I18n.default_locale
@@ -64,7 +66,7 @@ class ApplicationController < ActionController::Base
             requested_locale = params_locale || session[:locale] || cookies[:locale] || I18n.default_locale
         end
         requested_locale = FastGettext.best_locale_in(requested_locale)
-        session[:locale] = FastGettext.set_locale(requested_locale)
+        session[:locale] = I18n.locale = FastGettext.set_locale(requested_locale)
         if !@user.nil?
             if @user.locale != requested_locale
                 @user.locale = session[:locale]
@@ -117,12 +119,9 @@ class ApplicationController < ActionController::Base
     end
 
     def render_exception(exception)
-
-        # In development, or the admin interface, or for a local request, let Rails handle the exception
-        # with its stack trace templates. Local requests in testing are a special case so that we can
-        # test this method - there we use consider_all_requests_local to control behaviour.
-        if Rails.application.config.consider_all_requests_local || local_request? ||
-        (request.local? && !Rails.env.test?)
+        # In development or the admin interface let Rails handle the exception
+        # with its stack trace templates
+        if Rails.application.config.consider_all_requests_local || show_rails_exceptions?
             raise exception
         end
 
@@ -142,10 +141,13 @@ class ApplicationController < ActionController::Base
             ExceptionNotifier::Notifier.exception_notification(request.env, exception).deliver
             @status = 500
         end
-        render :template => "general/exception_caught", :status => @status
+        respond_to do |format|
+            format.html{ render :template => "general/exception_caught", :status => @status }
+            format.any{ render :nothing => true, :status => @status }
+        end
     end
 
-    def local_request?
+    def show_rails_exceptions?
         false
     end
 
@@ -207,19 +209,6 @@ class ApplicationController < ActionController::Base
         File.atomic_write(key_path) do |f|
             f.write(content)
         end
-    end
-
-    def request_dirs(info_request)
-        first_three_digits = info_request.id.to_s()[0..2]
-        File.join(first_three_digits.to_s, info_request.id.to_s)
-    end
-
-    def request_download_zip_dir(info_request)
-        File.join(download_zip_dir, "download", request_dirs(info_request))
-    end
-
-    def download_zip_dir()
-        File.join(Rails.root, '/cache/zips/')
     end
 
     # get the local locale
@@ -358,12 +347,15 @@ class ApplicationController < ActionController::Base
 
         # Peform the search
         @per_page = per_page
-        if this_page.nil?
-            @page = get_search_page_from_params
-        else
-            @page = this_page
-        end
-        result = InfoRequest.full_search(models, @query, order, ascending, collapse, @per_page, @page)
+        @page = this_page || get_search_page_from_params
+
+        result = ActsAsXapian::Search.new(models, @query,
+            :offset => (@page - 1) * @per_page,
+            :limit => @per_page,
+            :sort_by_prefix => order,
+            :sort_by_ascending => ascending,
+            :collapse_by_prefix => collapse
+        )
         result.results # Touch the results to load them, otherwise accessing them from the view
                        # might fail later if the database has subsequently been reopened.
         return result
@@ -537,9 +529,10 @@ class ApplicationController < ActionController::Base
         return country
     end
 
-    def set_popup_banner
-        @popup_banner = render_to_string(:partial => "general/popup_banner").strip.html_safe
+    def alaveteli_git_commit
+      `git log -1 --format="%H"`.strip
     end
+
     # URL generating functions are needed by all controllers (for redirects),
     # views (for links) and mailers (for use in emails), so include them into
     # all of all.

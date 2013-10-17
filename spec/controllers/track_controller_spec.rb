@@ -55,6 +55,39 @@ describe TrackController, "when making a new track on a request" do
 
 end
 
+describe TrackController, "when unsubscribing from a track" do
+
+    before do
+        @track_thing = FactoryGirl.create(:track_thing)
+    end
+
+    it 'should destroy the track thing' do
+        get :update, {:track_id => @track_thing.id,
+                      :track_medium => 'delete',
+                      :r => 'http://example.com'},
+                     {:user_id => @track_thing.tracking_user.id}
+        TrackThing.find(:first, :conditions => ['id = ? ', @track_thing.id]).should == nil
+    end
+
+    it 'should redirect to a URL on the site' do
+        get :update, {:track_id => @track_thing.id,
+                      :track_medium => 'delete',
+                      :r => '/'},
+                     {:user_id => @track_thing.tracking_user.id}
+        response.should redirect_to('/')
+    end
+
+    it 'should not redirect to a url on another site' do
+        track_thing = FactoryGirl.create(:track_thing)
+        get :update, {:track_id => @track_thing.id,
+                      :track_medium => 'delete',
+                      :r => 'http://example.com/'},
+                     {:user_id => @track_thing.tracking_user.id}
+        response.should redirect_to('/')
+    end
+
+end
+
 describe TrackController, "when sending alerts for a track" do
     render_views
 
@@ -64,8 +97,6 @@ describe TrackController, "when sending alerts for a track" do
     end
 
     it "should send alerts" do
-        # Don't do clever locale-insertion-unto-URL stuff
-        RoutingFilter.active = false
 
         # set the time the comment event happened at to within the last week
         ire = info_request_events(:silly_comment_event)
@@ -111,9 +142,6 @@ describe TrackController, "when sending alerts for a track" do
         TrackMailer.alert_tracks
         deliveries = ActionMailer::Base.deliveries
         deliveries.size.should == 0
-
-        # Restore the routing filters
-        RoutingFilter.active = true
     end
 
     it "should send localised alerts" do
@@ -144,6 +172,7 @@ describe TrackController, "when viewing RSS feed for a track" do
 
         get :track_request, :feed => 'feed', :url_title => track_thing.info_request.url_title
         response.should render_template('track/atom_feed')
+        response.content_type.should == 'application/atom+xml'
         # XXX should check it is an atom.builder type being rendered, not sure how to
 
         assigns[:xapian_object].matches_estimated.should == 3
@@ -158,6 +187,18 @@ describe TrackController, "when viewing RSS feed for a track" do
             get :track_user, :feed => 'feed', :url_name => "there_is_no_such_user"
         }.should raise_error(ActiveRecord::RecordNotFound)
     end
+
+    it 'should return atom/xml for a feed url without format specified, even if the
+        requester prefers json' do
+
+        request.env['HTTP_ACCEPT'] = 'application/json,text/xml'
+        track_thing = track_things(:track_fancy_dog_request)
+
+        get :track_request, :feed => 'feed', :url_title => track_thing.info_request.url_title
+        response.should render_template('track/atom_feed')
+        response.content_type.should == 'application/atom+xml'
+    end
+
 end
 
 describe TrackController, "when viewing JSON version of a track feed" do

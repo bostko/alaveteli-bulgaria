@@ -8,20 +8,23 @@ module MailHandler
     require 'backends/mail_backend'
     include Backends::MailBackend
 
+    class TNEFParsingError < StandardError
+    end
+
     # Returns a set of attachments from the given TNEF contents
     # The TNEF contents also contains the message body, but in general this is the
     # same as the message body in the message proper.
     def tnef_attachments(content)
         attachments = []
         Dir.mktmpdir do |dir|
-            IO.popen("#{`which tnef`.chomp} -K -C #{dir}", "wb") do |f|
+            IO.popen("tnef -K -C #{dir} 2> /dev/null", "wb") do |f|
                 f.write(content)
                 f.close
                 if $?.signaled?
                     raise IOError, "tnef exited with signal #{$?.termsig}"
                 end
                 if $?.exited? && $?.exitstatus != 0
-                    raise IOError, "tnef exited with status #{$?.exitstatus}"
+                    raise TNEFParsingError, "tnef exited with status #{$?.exitstatus}"
                 end
             end
             found = 0
@@ -34,7 +37,7 @@ module MailHandler
                 end
             end
             if found == 0
-                raise IOError, "tnef produced no attachments"
+                raise TNEFParsingError, "tnef produced no attachments"
             end
         end
         attachments
@@ -78,7 +81,7 @@ module MailHandler
             default_params = { :append_to => text, :binary_output => false }
             if content_type == 'application/vnd.ms-word'
                 AlaveteliExternalCommand.run("wvText", tempfile.path, tempfile.path + ".txt",
-                                             { :memory_limit => 536870912 } )
+                                             { :memory_limit => 536870912,  :timeout => 120 } )
                 # Try catdoc if we get into trouble (e.g. for InfoRequestEvent 2701)
                 if not File.exists?(tempfile.path + ".txt")
                     AlaveteliExternalCommand.run("catdoc", tempfile.path, default_params)

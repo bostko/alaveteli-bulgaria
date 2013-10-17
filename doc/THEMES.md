@@ -36,15 +36,15 @@ places:
 
 This document is about what you can do in a theme.
 
-By default, the sample theme ("alavetelitheme") has already been 
-installed.  See the setting `THEME_URLS` in `general.yml` for an 
+By default, the sample theme ("alavetelitheme") has already been
+installed.  See the setting `THEME_URLS` in `general.yml` for an
 explanation.
 
 You can also install the sample theme by hand, by running:
 
-    bundle exec rails plugin install git://github.com/mysociety/alavetelitheme.git -r rails-3
+    bundle exec rails plugin install git://github.com/mysociety/alavetelitheme.git
 
-The sample theme contains examples for nearly everything you might 
+The sample theme contains examples for nearly everything you might
 want to customise.  You should probably make a copy, rename it, and
 use that as the basis for your own theme.
 
@@ -61,10 +61,10 @@ changing much in the core theme.  The ideal would be if you are able
 to rebrand the site by only changing the CSS.  You will also need to
 add custom help pages, as described below.
 
-# Branding the site 
+# Branding the site
 
 The core templates that comprise the layout and user interface of an
-Alaveteli site live in `app/views/`.  They are use Rails' ERB syntax.
+Alaveteli site live in `app/views/`.  They use Rails' ERB syntax.
 For example, the template for the home page lives at
 `app/views/general/frontpage.html.erb`, and the template for the "about
 us" page is at `app/views/help/about.html.erb`.
@@ -158,7 +158,7 @@ unused).
 `alavetelitheme/lib/config/custom-routes.rb` allows you to extend the base routes in
 Alaveteli.  The example in `alavetelitheme` adds an extra help page.
 You can also use this to override the behaviour of specific pages if
-necessary.  
+necessary.
 
 # Adding or overriding models and controllers
 

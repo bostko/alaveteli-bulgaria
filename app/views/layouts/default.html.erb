@@ -10,7 +10,7 @@
         <% end %>
         </title>
 
-        <link rel="shortcut icon" href="/favicon.ico">
+        <%= render :partial => 'layouts/favicon' %>
 
         <%= render :partial => 'general/stylesheet_includes' %>
         <% if is_admin? %>
@@ -33,7 +33,7 @@
             <% end %>
         <% end %>
         <% if @has_json %>
-            <link rel="alternate" type="application/json" title="JSON version of this page" href="<%=h url_for(request.query_parameters.merge(:format => 'json')) %>">
+            <link rel="alternate" type="application/json" title="JSON version of this page" href="<%=h url_for(request.params.merge(:format => 'json')) %>">
         <% end %>
 
         <% if @no_crawl %>
@@ -52,7 +52,7 @@
                 'width': 920,
                 'height': 400,
                 'type': 'iframe',
-                'href': '/<%= I18n.locale %>/profile/sign_in?modal=1',
+                'href': '/<%= FastGettext.locale %>/profile/sign_in?modal=1',
                 'onClosed': function() {
                     // modal_signin_successful variable set by modal dialog box
                     if (typeof modal_signin_successful != 'undefined' ) {
@@ -67,11 +67,11 @@
 <% if is_admin? %>
   <%= render :partial => 'admin_general/admin_navbar' %>
 <% end %>
-
-<% if !@popup_banner.blank? %>
+<% popup_banner = render(:partial => "general/popup_banner").strip %>
+<% if popup_banner.present? %>
 <div id="everypage" class="jshide">
   <p class="popup-close"><a href="#top" onclick="$.cookie('seen_foi2', 1, { expires: 7, path: '/' }); $('#everypage').hide('slow'); return false;"><%= _('Close') %></a></p>
-  <%= @popup_banner %>
+  <%= raw popup_banner %>
   <p class="popup-close"><a href="#top" onclick="$.cookie('seen_foi2', 1, { expires: 7, path: '/' }); $('#everypage').hide('slow'); return false;"><%= _('Close') %></a></p>
 </div>
 <% end %>

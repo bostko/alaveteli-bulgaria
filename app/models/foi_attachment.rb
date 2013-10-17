@@ -1,11 +1,9 @@
 # encoding: UTF-8
-
 # == Schema Information
-# Schema version: 114
 #
 # Table name: foi_attachments
 #
-#  id                    :integer         not null, primary key
+#  id                    :integer          not null, primary key
 #  content_type          :text
 #  filename              :text
 #  charset               :text
@@ -71,7 +69,12 @@ class FoiAttachment < ActiveRecord::Base
             tries = 0
             delay = 1
             begin
-                @cached_body = File.open(self.filepath, "rb" ).read
+                binary_data = File.open(self.filepath, "rb" ).read
+                if self.content_type =~ /^text/
+                    @cached_body = convert_string_to_utf8_or_binary(binary_data, 'UTF-8')
+                else
+                    @cached_body = binary_data
+                end
             rescue Errno::ENOENT
                 # we've lost our cached attachments for some reason.  Reparse them.
                 if tries > BODY_MAX_TRIES

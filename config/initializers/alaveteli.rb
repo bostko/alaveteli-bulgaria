@@ -10,7 +10,7 @@ load "debug_helpers.rb"
 load "util.rb"
 
 # Application version
-ALAVETELI_VERSION = '0.10'
+ALAVETELI_VERSION = '0.14'
 
 # Add new inflection rules using the following format
 # (all these examples are active by default):
@@ -25,7 +25,6 @@ ALAVETELI_VERSION = '0.10'
 # Mime::Type.register "text/richtext", :rtf
 # Mime::Type.register "application/x-mobile", :mobile
 
-# The Rails cache is set up by the Interlock plugin to use memcached
 
 # Domain for URLs (so can work for scripts, not just web pages)
 ActionMailer::Base.default_url_options[:host] = AlaveteliConfiguration::domain
@@ -34,24 +33,12 @@ if AlaveteliConfiguration::force_ssl
   ActionMailer::Base.default_url_options[:protocol] = "https"
 end
 
-# fallback locale and available locales
-available_locales = AlaveteliConfiguration::available_locales.split(/ /)
-default_locale = AlaveteliConfiguration::default_locale
-
-FastGettext.default_available_locales = available_locales
-I18n.locale = default_locale
-I18n.available_locales = available_locales.map {|locale_name| locale_name.to_sym}
-I18n.default_locale = default_locale
-
-# Customise will_paginate URL generation
-WillPaginate::ViewHelpers.pagination_options[:renderer] = 'WillPaginateExtension::LinkRenderer'
 
 # Load monkey patches and other things from lib/
 require 'ruby19.rb'
 require 'activesupport_cache_extensions.rb'
 require 'use_spans_for_errors.rb'
 require 'activerecord_errors_extensions.rb'
-require 'willpaginate_extension.rb'
 require 'i18n_fixes.rb'
 require 'world_foi_websites.rb'
 require 'alaveteli_external_command.rb'
@@ -59,3 +46,15 @@ require 'quiet_opener.rb'
 require 'mail_handler'
 require 'public_body_categories'
 require 'ability'
+require 'normalize_string'
+require 'alaveteli_file_types'
+require 'alaveteli_localization'
+require 'message_prominence'
+
+AlaveteliLocalization.set_locales(AlaveteliConfiguration::available_locales,
+                                  AlaveteliConfiguration::default_locale)
+
+# Allow tests to be run under a non-superuser database account if required
+if Rails.env == 'test' and ActiveRecord::Base.configurations['test']['constraint_disabling'] == false
+  require 'no_constraint_disabling'
+end

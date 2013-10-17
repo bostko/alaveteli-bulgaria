@@ -1,18 +1,17 @@
 # == Schema Information
-# Schema version: 114
 #
 # Table name: outgoing_messages
 #
-#  id                           :integer         not null, primary key
-#  info_request_id              :integer         not null
-#  body                         :text            not null
-#  status                       :string(255)     not null
-#  message_type                 :string(255)     not null
-#  created_at                   :datetime        not null
-#  updated_at                   :datetime        not null
+#  id                           :integer          not null, primary key
+#  info_request_id              :integer          not null
+#  body                         :text             not null
+#  status                       :string(255)      not null
+#  message_type                 :string(255)      not null
+#  created_at                   :datetime         not null
+#  updated_at                   :datetime         not null
 #  last_sent_at                 :datetime
 #  incoming_message_followup_id :integer
-#  what_doing                   :string(255)     not null
+#  what_doing                   :string(255)      not null
 #
 
 # models/outgoing_message.rb:
@@ -23,7 +22,18 @@
 # Email: hello@mysociety.org; WWW: http://www.mysociety.org/
 
 class OutgoingMessage < ActiveRecord::Base
+    extend MessageProminence
+    include Rails.application.routes.url_helpers
+    include LinkToHelper
+    self.default_url_options[:host] = AlaveteliConfiguration::domain
+    # https links in emails if forcing SSL
+    if AlaveteliConfiguration::force_ssl
+      self.default_url_options[:protocol] = "https"
+    end
+
     strip_attributes!
+
+    has_prominence
 
     belongs_to :info_request
     validates_presence_of :info_request
@@ -80,15 +90,15 @@ class OutgoingMessage < ActiveRecord::Base
         end
 
         if self.what_doing == 'internal_review'
-            "Please pass this on to the person who conducts Freedom of Information reviews." +
+            _("Please pass this on to the person who conducts Freedom of Information reviews.") +
             "\n\n" +
-            "I am writing to request an internal review of " +
-            self.info_request.public_body.name +
-            "'s handling of my FOI request " +
-            "'" + self.info_request.title + "'." +
+            _("I am writing to request an internal review of {{public_body_name}}'s handling of my FOI request '{{info_request_title}}'.",
+              :public_body_name => self.info_request.public_body.name,
+              :info_request_title => self.info_request.title) +
             "\n\n\n\n [ " + self.get_internal_review_insert_here_note + " ] \n\n\n\n" +
-            "A full history of my FOI request and all correspondence is available on the Internet at this address:\n" +
-            "http://" + AlaveteliConfiguration::domain + "/request/" + self.info_request.url_title
+            _("A full history of my FOI request and all correspondence is available on the Internet at this address: {{url}}",
+            :url => request_url(self.info_request)) +
+            "\n"
         else
             ""
         end
@@ -201,11 +211,11 @@ class OutgoingMessage < ActiveRecord::Base
     end
 
     # Returns text for indexing / text display
-    def get_text_for_indexing
+    def get_text_for_indexing(strip_salutation=true)
         text = self.body.strip
 
         # Remove salutation
-        text.sub!(/Dear .+,/, "")
+        text.sub!(/Dear .+,/, "") if strip_salutation
 
         # Remove email addresses from display/index etc.
         self.remove_privacy_sensitive_things!(text)
@@ -224,6 +234,12 @@ class OutgoingMessage < ActiveRecord::Base
         text = text.gsub(/\n/, '<br>')
         return text.html_safe
     end
+
+    # Return body for display as text
+    def get_body_for_text_display
+         get_text_for_indexing(strip_salutation=false)
+    end
+
 
     def fully_destroy
         ActiveRecord::Base.transaction do
@@ -255,7 +271,7 @@ class OutgoingMessage < ActiveRecord::Base
     end
 
     def format_of_body
-        if self.body.empty? || self.body =~ /\A#{get_salutation}\s+#{get_signoff}/ || self.body =~ /#{get_internal_review_insert_here_note}/
+        if self.body.empty? || self.body =~ /\A#{Regexp.escape(get_salutation)}\s+#{Regexp.escape(get_signoff)}/ || self.body =~ /#{Regexp.escape(get_internal_review_insert_here_note)}/
             if self.message_type == 'followup'
                 if self.what_doing == 'internal_review'
                     errors.add(:body, _("Please give details explaining why you want a review"))

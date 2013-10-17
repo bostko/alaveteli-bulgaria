@@ -53,7 +53,7 @@ module LinkToHelper
 
     # Respond to request
     def respond_to_last_url(info_request, options = {})
-        last_response = info_request.get_last_response
+        last_response = info_request.get_last_public_response
         if last_response.nil?
             show_response_no_followup_url(options.merge(:id => info_request.id))
         else
@@ -217,9 +217,6 @@ module LinkToHelper
         url = url.gsub("%2F", "/")
 
         return url
-    end
-    def search_link(query, variety_postfix = nil, sort_postfix = nil, advanced = nil)
-        link_to h(query), search_url(query)
     end
 
     def search_path(query, options = {})

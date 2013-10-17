@@ -19,8 +19,8 @@ class UserController < ApplicationController
     # Show page about a user
     def show
         long_cache
-        if MySociety::Format.simplify_url_part(params[:url_name], 'user', 32) != params[:url_name]
-            redirect_to :url_name =>  MySociety::Format.simplify_url_part(params[:url_name], 'user', 32), :status => :moved_permanently
+        if MySociety::Format.simplify_url_part(params[:url_name], 'user') != params[:url_name]
+            redirect_to :url_name =>  MySociety::Format.simplify_url_part(params[:url_name], 'user'), :status => :moved_permanently
             return
         end
         if params[:view].nil?
@@ -119,7 +119,11 @@ class UserController < ApplicationController
             @track_things = TrackThing.find(:all, :conditions => ["tracking_user_id = ? and track_medium = ?", @display_user.id, 'email_daily'], :order => 'created_at desc')
             for track_thing in @track_things
                 # XXX factor out of track_mailer.rb
-                xapian_object = InfoRequest.full_search([InfoRequestEvent], track_thing.track_query, 'described_at', true, nil, 20, 1)
+                xapian_object = ActsAsXapian::Search.new([InfoRequestEvent], track_thing.track_query,
+                    :sort_by_prefix => 'described_at',
+                    :sort_by_ascending => true,
+                    :collapse_by_prefix => nil,
+                    :limit => 20)
                 feed_results += xapian_object.results.map {|x| x[:model]}
             end
         end
@@ -527,11 +531,12 @@ class UserController < ApplicationController
     def get_draft_profile_photo
         profile_photo = ProfilePhoto.find(params[:id])
         response.content_type = "image/png"
-        render_for_text(profile_photo.data)
+        render :text => profile_photo.data
     end
 
     # actual profile photo of a user
     def get_profile_photo
+        long_cache
         @display_user = User.find(:first, :conditions => [ "url_name = ? and email_confirmed = ?", params[:url_name], true ])
         if !@display_user
             raise ActiveRecord::RecordNotFound.new("user not found, url_name=" + params[:url_name])
@@ -542,7 +547,7 @@ class UserController < ApplicationController
         end
 
         response.content_type = "image/png"
-        render_for_text(@display_user.profile_photo.data)
+        render :text => @display_user.profile_photo.data
     end
 
     # Change about me text on your profile page
